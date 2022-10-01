@@ -4,16 +4,15 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
-{
+  {
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
-};
+  };
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -82,7 +81,7 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 struct thread
-{
+  {
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -97,34 +96,11 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-      /*-------------------------------------------------------------------------------*/
-    int exit_status;
-
-    struct list children;
-    struct list files;
-    struct thread* parent;
-
-    struct semaphore wait_lock;
-    struct semaphore mutex;
-    int wait_which_child;
-    bool wait_already;
-    bool killed_notby_kernel;
-    /*-------------------------------------------------------------------------------*/
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-};
-
-/*-----------------------------------------------------------------------------*/
-struct child {
-    int tid;
-    struct list_elem elem;
-    int exit_status;
-    bool hold_lock_or_not;
-    bool alive;
-};
-/*-----------------------------------------------------------------------------*/
+  };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -162,10 +138,4 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/*------------------------------------------------------------------------------*/
-void child_init(struct child *, tid_t);
-struct list_elem * findsChildbyID(tid_t id, struct list *childList);
-/*------------------------------------------------------------------------------*/
 #endif /* threads/thread.h */
-
-

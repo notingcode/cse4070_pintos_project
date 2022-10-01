@@ -192,7 +192,7 @@ void close(int fd)
 }
 
 int read(int fd, void *buffer, unsigned size){
-    if(fd == STDIN_FILENO){
+    if(fd == 0){
         uint8_t * buffer_ = (uint8_t *) buffer;
         for(int i = 0; i < size; i++)
             buffer_[i] = input_getc();
@@ -207,7 +207,7 @@ int read(int fd, void *buffer, unsigned size){
 }
 
 int write(int fd, void *buffer, unsigned size){
-    if(fd == STDOUT_FILENO){
+    if(fd == 1){
         putbuf(buffer, size);
         return size;
     }else{

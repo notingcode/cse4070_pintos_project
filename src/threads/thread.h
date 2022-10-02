@@ -97,7 +97,6 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-      /*-------------------------------------------------------------------------------*/
     int exit_status;
 
     struct list children;
@@ -107,24 +106,21 @@ struct thread
     struct semaphore wait_lock;
     struct semaphore mutex;
     int wait_which_child;
-    bool wait_already;
+    bool is_waiting;
     bool killed_notby_kernel;
-    /*-------------------------------------------------------------------------------*/
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 };
 
-/*-----------------------------------------------------------------------------*/
 struct child {
     int tid;
     struct list_elem elem;
     int exit_status;
-    bool hold_lock_or_not;
+    bool has_lock;
     bool alive;
 };
-/*-----------------------------------------------------------------------------*/
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -162,10 +158,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/*------------------------------------------------------------------------------*/
-void child_init(struct child *, tid_t);
-struct list_elem * findsChildbyID(tid_t id, struct list *childList);
-/*------------------------------------------------------------------------------*/
+void child_init(struct child*, tid_t);
+struct list_elem* getChild(tid_t id, struct list *childList);
+
 #endif /* threads/thread.h */
-
-

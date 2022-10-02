@@ -9,8 +9,7 @@
 #include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
-/*-----------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------*/
+
 typedef int pid_t;
 
 bool create (const char *file, unsigned initial_size);
@@ -27,9 +26,9 @@ int wait(pid_t pid);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 bool remove(const char *file);
-int filesize(int fd);
+int fibonacci(int n);
+int max_of_four_int(int a, int b, int c, int d);
 
-static struct semaphore sema_;
 static int fd = 2;
 
 struct file_fd_map {
@@ -37,18 +36,11 @@ struct file_fd_map {
     int fd;
     struct list_elem elem;
 };
-/*-----------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------*/
 
 void
 syscall_init (void)
 {
     intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-    /*-----------------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------*/
-    sema_init(&sema_, 1);
-    /*-----------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------------*/
 }
 
 static void
@@ -59,8 +51,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     switch (*(int*)(f->esp))
     {
-/*-----------------------------------------------------------------------------------------*/
-/*------------------------------------------------------------------------------------*/
         case SYS_EXIT:
             is_user_addr_valid(f->esp+4);
             exit(*(int *)(f->esp+4));
@@ -70,23 +60,17 @@ syscall_handler (struct intr_frame *f UNUSED)
             is_user_addr_valid(f->esp+16);
             is_user_addr_valid(f->esp+20);
             is_user_addr_valid(*(int *)(f->esp+16));
-            sema_down(&sema_);
             f->eax = create(*(int *)(f->esp+16),*(unsigned *)(f->esp+20));
-            sema_up(&sema_);
             break;
 
         case SYS_OPEN:
             is_user_addr_valid(*(int *)(f->esp+4));
-            sema_down(&sema_);
             f->eax= open(*(int *)(f->esp+4));
-            sema_up(&sema_);
             break;
 
         case SYS_CLOSE:
             is_user_addr_valid(f->esp+4);
-            sema_down(&sema_);
             close(*(int *)(f->esp+4));
-            sema_up(&sema_);
             break;
 
         case SYS_READ:
@@ -94,9 +78,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             is_user_addr_valid(f->esp+20);
             is_user_addr_valid(f->esp+24);
             is_user_addr_valid(*(int *)(f->esp+24));
-            sema_down(&sema_);
             f->eax = read(*(int *)(f->esp+20),*(int *)(f->esp+24),*(unsigned *)(f->esp+28));
-            sema_up(&sema_);
             break;
 
         case SYS_WRITE:
@@ -104,16 +86,12 @@ syscall_handler (struct intr_frame *f UNUSED)
             is_user_addr_valid(f->esp+20);
             is_user_addr_valid(f->esp+24);
             is_user_addr_valid(*(int *)(f->esp+24));
-            sema_down(&sema_);
             f->eax = write(*(int *)(f->esp+20),*(int *)(f->esp+24),*(unsigned *)(f->esp+28));
-            sema_up(&sema_);
             break;
 
         case SYS_EXEC:
             is_user_addr_valid(*(int *)(f->esp+4));
-            sema_down(&sema_);
             f->eax = exec(*(int *)(f->esp+4));
-            sema_up(&sema_);
             break;
 
         case SYS_WAIT:
@@ -128,38 +106,40 @@ syscall_handler (struct intr_frame *f UNUSED)
         case SYS_SEEK:
             is_user_addr_valid(f->esp+16);
             is_user_addr_valid(f->esp+20);
-            sema_down(&sema_);
             seek(*(int *)(f->esp+16), *(int *)(f->esp+20));
-            sema_up(&sema_);
             break;
 
         case SYS_TELL:
             is_user_addr_valid(f->esp+4);
-            sema_down(&sema_);
             f->eax = tell(*(int *)(f->esp+4));
-            sema_up(&sema_);
             break;
 
         case SYS_REMOVE:
             is_user_addr_valid(f->esp+4);
-            sema_down(&sema_);
             f->eax = remove(*(int *)(f->esp+4));
-            sema_up(&sema_);
             break;
 
-        case SYS_FILESIZE:
-            is_user_addr_valid(f->esp+4);
-            sema_down(&sema_);
-            f->eax = filesize(*(int *)(f->esp+4));
-            sema_up(&sema_);
+        case SYS_FIBO:
+            is_user_addr_valid(f->esp+16);
+            f->eax = fibonacci(*(int *)(f->esp+16));
             break;
-/*------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------*/
+
+        case SYS_MAXOFFOURINT:
+            is_user_addr_valid(f->esp+16);
+            is_user_addr_valid(f->esp+20);
+            is_user_addr_valid(f->esp+24);
+            is_user_addr_valid(f->esp+28);
+            f->eax = max_of_four_int(*(int *)(f->esp+16), *(int *)(f->esp+20)
+                                    ,*(int *)(f->esp+24), *(int *)(f->esp+28));
+
+            printf("\n\n\n%d %d %d %d \n\n\n", *(int *)(f->esp+16), *(int *)(f->esp+20)
+                                    ,*(int *)(f->esp+24), *(int *)(f->esp+28));
+            
+            break;
+
     }
 }
 
-/*-----------------------------------------------------------------------------------------*/
-/*------------------------------------------------------------------------------------*/
 bool create (const char *file, unsigned initial_size){
     return filesys_create(file, initial_size);
 }
@@ -301,9 +281,9 @@ int filesize(int fd){
 void exit(int status)
 {
 
-    struct list_elem *e1=NULL;
+    struct list_elem *e1 = NULL;
 
-    e1 = findsChildbyID(thread_current()->tid, &thread_current()->parent->children);
+    e1 = getChild(thread_current()->tid, &thread_current()->parent->children);
 
     if(e1 != NULL){
 
@@ -316,7 +296,7 @@ void exit(int status)
 
         ch->alive = false;
         ch->exit_status = status;
-        ch->hold_lock_or_not = false;
+        ch->has_lock = false;
 
         thread_current()->killed_notby_kernel = false;
         thread_current()->exit_status = status;
@@ -328,8 +308,20 @@ void exit(int status)
         return;
     }
 }
-/*------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------*/
 
+int fibonacci(int n){
+    if (n <= 1)
+        return n;
 
+    return n + fibonacci(n-1);
+}
 
+int max_of_four_int(int a, int b, int c, int d){
+    int max = a;
+
+    max = max < b ? b : max;
+    max = max < c ? c : max;
+    max = max < d ? d : max;
+
+    return max;
+}

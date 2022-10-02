@@ -65,7 +65,7 @@ struct thread
     int wait_which_child_process;		//the child process it is waiting for
 
     /*--------------------------------------------------------*/
-    bool wait_already;	//the blocked status of the thread
+    bool is_waiting;	//the blocked status of the thread
     bool killed_notby_kernel;	//check whether the thread is killed by kernel or syscal
     /*————————————————————————————————————————————————————————*/
 };
@@ -85,7 +85,7 @@ struct child {
     struct list_elem elem;
     int exit_status;
     /*--------------------------------------------------------*/
-    bool hold_lock_or_not;		//if the child is holding a lock or not
+    bool has_lock;		//if the child is holding a lock or not
     bool alive;		//if the child process is alive or not
     /*--------------------------------------------------------*/
 }
@@ -122,7 +122,7 @@ Let’s say when a write system call is requiring reading the system call, we’
 
 >> B8: Consider parent process P with child process C.  How do you ensure proper synchronization and avoid race conditions when P calls wait(C) before C exits?  After C exits?  How do you ensure that all resources are freed in each case?  How about when P terminates without waiting, before C exits?  After C exits?  Are there any special cases?
 
->> We have a semaphore to control the access for both P and C. In the wait function, the parent has to wait the exit of C. After C exits, it would sema up the semaphore and unblock its parent. if P calls wait(C) wait after C exits, P has a property called wait_already. This property can never have a chance to be changed by child in this case, so P has to exit. when a process exits, it has to free all resources it has. If P terminates without waiting, basically we don’t need to do anything because P would free all the resources when it terminates.When C tries to set it’s status and find out parent has exited, it will ignore it and continue to execute. No. no special cases.
+>> We have a semaphore to control the access for both P and C. In the wait function, the parent has to wait the exit of C. After C exits, it would sema up the semaphore and unblock its parent. if P calls wait(C) wait after C exits, P has a property called is_waiting. This property can never have a chance to be changed by child in this case, so P has to exit. when a process exits, it has to free all resources it has. If P terminates without waiting, basically we don’t need to do anything because P would free all the resources when it terminates.When C tries to set it’s status and find out parent has exited, it will ignore it and continue to execute. No. no special cases.
 
 
 ---- RATIONALE ----

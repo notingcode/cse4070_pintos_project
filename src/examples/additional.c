@@ -14,9 +14,9 @@ main (int argc, char *argv[])
 
     fib = fibonacci(num_list[0]);
 
-    max = max_of_four_int(num_list[0], num_list[2], num_list[3], num_list[4]);
+    max = max_of_four_int(num_list[0], num_list[1], num_list[2], num_list[3]);
 
-    printf("\n%d %d\n", fib, max);
+    printf("\n%d %d\n\n", fib, max);
 
     return EXIT_SUCCESS;
 }

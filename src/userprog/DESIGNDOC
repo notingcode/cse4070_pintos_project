@@ -62,7 +62,7 @@ struct thread
     struct list child_list; 	//the list to store the child processes
     struct thread* parent;	//its parent thread
 
-    int wait_which_child_process;		//the child process it is waiting for
+    int waiting_child_number_process;		//the child process it is waiting for
 
     /*--------------------------------------------------------*/
     bool is_waiting;	//the blocked status of the thread

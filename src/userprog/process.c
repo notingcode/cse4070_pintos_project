@@ -62,8 +62,8 @@ start_process(void *file_name_)
     char *file_name = file_name_;
     struct intr_frame if_;
     bool success;
-    struct thread *curr = thread_current();
-    struct thread *curr_par = thread_current()->parent;
+    // struct thread *curr = thread_current();
+    // struct thread *curr_par = thread_current()->parent;
 
     /* Initialize interrupt frame and load executable. */
     memset(&if_, 0, sizeof if_);

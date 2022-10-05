@@ -214,28 +214,6 @@ int write(int fd, void *buffer, unsigned size)
     return -1;
 }
 
-struct file *get_file_from_fd(int fd)
-{
-
-    if (!list_empty(&thread_current()->files))
-    {
-        struct list_elem *list_elem_;
-        for (
-            list_elem_ = list_begin(&thread_current()->files);
-            list_elem_ != list_end(&thread_current()->files);
-            list_elem_ = list_next(list_elem_))
-        {
-            struct file_fd_map *ffd_map = list_entry(list_elem_, struct file_fd_map, elem);
-            if (ffd_map->fd == fd)
-            {
-                return ffd_map->file_;
-            }
-        }
-    }
-
-    return NULL;
-}
-
 void is_user_addr_valid(const void *vaddr)
 {
     if (!is_user_vaddr(vaddr) || !pagedir_get_page(thread_current()->pagedir, vaddr))
@@ -347,6 +325,28 @@ void exit(int status)
         thread_exit();
         return;
     }
+}
+
+struct file *get_file_from_fd(int fd)
+{
+
+    if (!list_empty(&thread_current()->files))
+    {
+        struct list_elem *list_elem_;
+        for (
+            list_elem_ = list_begin(&thread_current()->files);
+            list_elem_ != list_end(&thread_current()->files);
+            list_elem_ = list_next(list_elem_))
+        {
+            struct file_fd_map *ffd_map = list_entry(list_elem_, struct file_fd_map, elem);
+            if (ffd_map->fd == fd)
+            {
+                return ffd_map->file_;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 int fibonacci(int n)

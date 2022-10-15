@@ -273,21 +273,17 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
     /* Open executable file. */
 
-    char *token, *saveptr, *argv[100];
     int argc = 0;
+    char *argv[100], *token, *savePtr;
 
-    char *fn_copy = malloc(strlen(file_name) + 1);
-    strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+    argv[argc++] = strtok_r(file_name, " ", &savePtr);
 
-    while ((token = strtok_r(fn_copy, " ", &saveptr)) != NULL)
+    while ((token = strtok_r(savePtr, " ", &savePtr)) != NULL)
     {
         argv[argc++] = token;
-        fn_copy = NULL;
     }
 
     file = filesys_open(argv[0]);
-
-    free(fn_copy);
 
     if (file == NULL)
     {
@@ -364,16 +360,16 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     if (!setup_stack(esp, argc, argv))
         goto done;
 
-    char *argv_esp[100];
+    // char *argv_esp[100];
 
-    for (int i = argc - 1; i >= 0; i--)
-    {
-        *esp -= strlen(argv[i]) + 1;
-        strlcpy((char *)*esp, argv[i], strlen(argv[i]) + 1);
-        argv_esp[i] = (char *)*esp;
-    }
+    // for (int i = argc - 1; i >= 0; i--)
+    // {
+    //     *esp -= strlen(argv[i]) + 1;
+    //     strlcpy((char *)*esp, argv[i], strlen(argv[i]) + 1);
+    //     argv_esp[i] = (char *)*esp;
+    // }
 
-    set_user_stack(esp, argc, argv_esp);
+    set_user_stack(esp, argc, argv);
 
     /* Start address. */
     *eip = (void (*)(void))ehdr.e_entry;
@@ -535,6 +531,14 @@ install_page(void *upage, void *kpage, bool writable)
 
 void set_user_stack(void **esp, int argc, char **argv)
 {
+char *argv_esp[100];
+
+    for (int i = argc - 1; i >= 0; i--)
+    {
+        *esp -= strlen(argv[i]) + 1;
+        strlcpy((char *)*esp, argv[i], strlen(argv[i]) + 1);
+        argv_esp[i] = (char *)*esp;
+    }
 
     while ((int)(*esp) % 4 != 0)
     {
@@ -548,7 +552,7 @@ void set_user_stack(void **esp, int argc, char **argv)
     for (int i = argc - 1; i >= 0; i--)
     {
         *esp -= 4;
-        (*(int *)(*esp)) = argv[i];
+        (*(int *)(*esp)) = argv_esp[i];
     }
 
     *esp -= 4;

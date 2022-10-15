@@ -360,15 +360,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     if (!setup_stack(esp, argc, argv))
         goto done;
 
-    // char *argv_esp[100];
-
-    // for (int i = argc - 1; i >= 0; i--)
-    // {
-    //     *esp -= strlen(argv[i]) + 1;
-    //     strlcpy((char *)*esp, argv[i], strlen(argv[i]) + 1);
-    //     argv_esp[i] = (char *)*esp;
-    // }
-
     set_user_stack(esp, argc, argv);
 
     /* Start address. */
@@ -531,7 +522,7 @@ install_page(void *upage, void *kpage, bool writable)
 
 void set_user_stack(void **esp, int argc, char **argv)
 {
-char *argv_esp[100];
+    char *argv_esp[100];
 
     for (int i = argc - 1; i >= 0; i--)
     {

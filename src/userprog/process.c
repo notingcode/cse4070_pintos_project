@@ -27,7 +27,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
-    char *fn_copy, *cmd_name, *save_ptr;
+    char *fn_copy, *savePtr, *cmd_name;
     tid_t tid;
 
     /* Make a copy of FILE_NAME.
@@ -39,9 +39,7 @@ tid_t process_execute(const char *file_name)
 
     struct thread *cur = thread_current();
 
-    cmd_name = malloc(strlen(file_name) + 1);
-    strlcpy(cmd_name, file_name, strlen(file_name) + 1);
-    cmd_name = strtok_r(cmd_name, " ", &save_ptr);
+    cmd_name = strtok_r(file_name, " ", &savePtr);
 
     tid = thread_create(cmd_name, PRI_DEFAULT, start_process, fn_copy);
 
@@ -493,7 +491,7 @@ setup_stack(void **esp, int argc, char **argv)
     {
         success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
         if (success)
-            *esp = PHYS_BASE - 12;
+            *esp = PHYS_BASE;
         else
             palloc_free_page(kpage);
     }

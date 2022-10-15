@@ -200,8 +200,6 @@ tid_t thread_create(const char *name, int priority,
   child_init(child_, tid);
   t->parent = thread_current();
 
-  // sema_down(&thread_current()->binary_semaphore);
-
   return tid;
 }
 

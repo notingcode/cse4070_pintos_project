@@ -27,7 +27,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
-    char *fn_copy, *cmd_name, *args;
+    char *fn_copy, *cmd_name, *save_ptr;
     tid_t tid;
 
     /* Make a copy of FILE_NAME.
@@ -37,14 +37,13 @@ tid_t process_execute(const char *file_name)
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
 
-    char *fn_copy2, *saveptr;
     struct thread *cur = thread_current();
 
-    fn_copy2 = malloc(strlen(file_name) + 1);
-    strlcpy(fn_copy2, file_name, strlen(file_name) + 1);
-    fn_copy2 = strtok_r(fn_copy2, " ", &saveptr);
+    cmd_name = malloc(strlen(file_name) + 1);
+    strlcpy(cmd_name, file_name, strlen(file_name) + 1);
+    cmd_name = strtok_r(cmd_name, " ", &save_ptr);
 
-    tid = thread_create(fn_copy2, PRI_DEFAULT, start_process, fn_copy);
+    tid = thread_create(cmd_name, PRI_DEFAULT, start_process, fn_copy);
 
     sema_down(&cur->binary_semaphore);
 
@@ -62,8 +61,6 @@ start_process(void *file_name_)
     char *file_name = file_name_;
     struct intr_frame if_;
     bool success;
-    // struct thread *curr = thread_current();
-    // struct thread *curr_par = thread_current()->parent;
 
     /* Initialize interrupt frame and load executable. */
     memset(&if_, 0, sizeof if_);

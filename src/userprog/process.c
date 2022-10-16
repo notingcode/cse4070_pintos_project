@@ -39,9 +39,13 @@ tid_t process_execute(const char *file_name)
 
     struct thread *cur = thread_current();
 
-    cmd_name = strtok_r(file_name, " ", &savePtr);
+    cmd_name = malloc(strlen(file_name)+1);
+    strlcpy(cmd_name, file_name, strlen(file_name)+1);
+    cmd_name = strtok_r(cmd_name, " ", &savePtr);
 
     tid = thread_create(cmd_name, PRI_DEFAULT, start_process, fn_copy);
+
+    free(cmd_name);
 
     sema_down(&cur->binary_semaphore);
 
@@ -74,6 +78,7 @@ start_process(void *file_name_)
     {
         thread_exit();
     }
+
 
     /* Start the user process by simulating a return from an
        interrupt, implemented by intr_exit (in
@@ -138,8 +143,8 @@ void process_exit(void)
     struct thread *curr = thread_current();
     uint32_t *pd;
 
-    if (curr->exit_status == -4)
-        exit(-4);
+    if (!curr->killed_by_kernel)
+        exit(-1);
 
     if (curr->parent->is_waiting && curr->parent->waiting_child_number == curr->tid)
         sema_up(&thread_current()->parent->binary_semaphore);
@@ -271,10 +276,14 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
     /* Open executable file. */
 
+    char *fn_copy;
     int argc = 0;
     char *argv[100], *token, *savePtr;
 
-    argv[argc++] = strtok_r(file_name, " ", &savePtr);
+    fn_copy = malloc(strlen(file_name)+1);
+    strlcpy(fn_copy, file_name, strlen(file_name)+1);
+
+    argv[argc++] = strtok_r(fn_copy, " ", &savePtr);
 
     while ((token = strtok_r(savePtr, " ", &savePtr)) != NULL)
     {
@@ -354,6 +363,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
         }
     }
 
+    file_deny_write(file);
+
     /* Set up stack. */
     if (!setup_stack(esp, argc, argv))
         goto done;
@@ -364,6 +375,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     *eip = (void (*)(void))ehdr.e_entry;
 
     success = true;
+
+    free(fn_copy);
 
 done:
     /* We arrive here whether the load is successful or not. */

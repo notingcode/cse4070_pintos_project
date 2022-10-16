@@ -463,6 +463,7 @@ init_thread(struct thread *t, const char *name, int priority)
   list_init(&t->files);
   t->exit_status = -4;
   sema_init(&t->binary_semaphore, 0);
+  t->killed_by_kernel = false;
   t->waiting_child_number = 0;
   t->is_waiting = false;
 }

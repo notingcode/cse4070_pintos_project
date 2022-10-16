@@ -105,6 +105,7 @@ struct thread
    struct semaphore binary_semaphore;
    int waiting_child_number;
    bool is_waiting;
+   bool killed_by_kernel;
    int exit_status;
 #endif
 

@@ -45,12 +45,12 @@ tid_t process_execute(const char *file_name)
 
     tid = thread_create(cmd_name, PRI_DEFAULT, start_process, fn_copy);
 
-    free(cmd_name);
-
     sema_down(&cur->binary_semaphore);
 
     if (tid == TID_ERROR)
         palloc_free_page(fn_copy);
+
+    free(cmd_name);
 
     return tid;
 }
@@ -72,10 +72,10 @@ start_process(void *file_name_)
     success = load(file_name, &if_.eip, &if_.esp);
 
     /* If load failed, quit. */
-    palloc_free_page(file_name);
     sema_up(&thread_current()->parent->binary_semaphore);
     if (!success)
     {
+        palloc_free_page(file_name);
         thread_exit();
     }
 
@@ -107,13 +107,10 @@ int process_wait(tid_t child_tid UNUSED)
     if (thread_current()->is_waiting)
         return -1;
 
-    struct list_elem *child_in_list = NULL;
-
-    child_in_list = getChild(child_tid, &thread_current()->children);
+    struct list_elem *child_in_list = getChild(child_tid, &thread_current()->children);
 
     if (child_in_list != NULL)
     {
-
         struct child *child_ = list_entry(child_in_list, struct child, elem);
 
         if (child_ == NULL)
@@ -247,7 +244,7 @@ struct Elf32_Phdr
 #define PF_W 2 /* Writable. */
 #define PF_R 4 /* Readable. */
 
-static bool setup_stack(void **esp, int argc, char **argv);
+static bool setup_stack(void **esp);
 void set_user_stack(void **esp, int argc, char **argv);
 
 static bool validate_segment(const struct Elf32_Phdr *, struct file *);
@@ -276,21 +273,16 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
     /* Open executable file. */
 
-    char *fn_copy;
     int argc = 0;
     char *argv[100], *token, *savePtr;
 
-    fn_copy = malloc(strlen(file_name)+1);
-    strlcpy(fn_copy, file_name, strlen(file_name)+1);
-
-    argv[argc++] = strtok_r(fn_copy, " ", &savePtr);
+    argv[argc++] = strtok_r(file_name, " ", &savePtr);
+    file = filesys_open(argv[0]);
 
     while ((token = strtok_r(savePtr, " ", &savePtr)) != NULL)
     {
         argv[argc++] = token;
     }
-
-    file = filesys_open(argv[0]);
 
     if (file == NULL)
     {
@@ -362,11 +354,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
             break;
         }
     }
-
     file_deny_write(file);
-
     /* Set up stack. */
-    if (!setup_stack(esp, argc, argv))
+    if (!setup_stack(esp))
         goto done;
 
     set_user_stack(esp, argc, argv);
@@ -375,8 +365,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     *eip = (void (*)(void))ehdr.e_entry;
 
     success = true;
-
-    free(fn_copy);
 
 done:
     /* We arrive here whether the load is successful or not. */
@@ -494,7 +482,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack(void **esp, int argc, char **argv)
+setup_stack(void **esp)
 {
     uint8_t *kpage;
     bool success = false;

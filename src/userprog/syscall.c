@@ -1,10 +1,12 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
-#include <stdint.h>
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 #include "list.h"
 #include "process.h"
 #include "threads/synch.h"
@@ -52,7 +54,11 @@ static void
 syscall_handler(struct intr_frame *f UNUSED)
 {
     void *esp = f->esp;
+
     is_user_addr_valid(esp);
+    is_user_addr_valid(esp+1);
+    is_user_addr_valid(esp+2);
+    is_user_addr_valid(esp+3);
     
     switch (*(int *)(esp))
     {
@@ -105,6 +111,8 @@ syscall_handler(struct intr_frame *f UNUSED)
         break;
 
     case SYS_EXEC:
+        is_user_addr_valid(esp + 4);
+        is_user_addr_valid(esp + 5);
         is_user_addr_valid(*(int *)(esp + 4));
         sema_down(&binary_semaphore);
         f->eax = exec(*(int *)(esp + 4));
@@ -237,9 +245,9 @@ int write(int fd, void *buffer, unsigned size)
     }
     else
     {
-        if (get_file_from_fd(fd) != NULL)
+        struct file *file_ = get_file_from_fd(fd);
+        if (file_ != NULL)
         {
-            struct file *file_ = get_file_from_fd(fd);
             return file_write(file_, buffer, size);
         }
     }

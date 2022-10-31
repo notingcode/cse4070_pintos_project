@@ -95,9 +95,7 @@ syscall_handler(struct intr_frame *f UNUSED)
         is_user_addr_valid(esp + 20);
         is_user_addr_valid(esp + 24);
         is_user_addr_valid(*(int *)(esp + 24));
-        sema_down(&binary_semaphore);
         f->eax = read(*(int *)(esp + 20), *(int *)(esp + 24), *(unsigned *)(esp + 28));
-        sema_up(&binary_semaphore);
         break;
 
     case SYS_WRITE:

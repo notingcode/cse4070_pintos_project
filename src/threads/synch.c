@@ -27,6 +27,7 @@
 */
 
 #include "threads/synch.h"
+#include "kernel/list.h"
 #include <stdio.h>
 #include <string.h>
 #include "threads/interrupt.h"
@@ -68,7 +69,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current ()->elem, less_priority, NULL);
       thread_block ();
     }
   sema->value--;
@@ -113,10 +114,13 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)){
+      //sort the list and make sure we can unblock the top one of the list
+      list_sort (&sema->waiters, less_priority, NULL);
+      thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+  }
   sema->value++;
+  thread_yield();     //once a thread is unblocked, we put it into the ready queue and let the CPU reschedule
   intr_set_level (old_level);
 }
 
@@ -156,7 +160,7 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -192,12 +196,58 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
-  ASSERT (lock != NULL);
-  ASSERT (!intr_context ());
-  ASSERT (!lock_held_by_current_thread (lock));
+    ASSERT (lock != NULL);
+    ASSERT (!intr_context ());
+    ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+    if(lock->holder != NULL && !thread_mlfqs) {
+        //because the lock already has a holder, so the lock has to wait until the holder release the lock
+        thread_current()->wait_which_lock = lock;
+        //give the lock value to lock_ref as a temp variable so it can use a while loop to do recursion
+        struct lock *lock_ref = lock;
+        //if the lock_ref exits and it has a holder, do recursion
+        while(lock_ref !=  NULL && lock_ref->holder != NULL){
+            //and the current_thread's priority should be larger than the lock_ref's priority, otherwise there is no donation occurring
+            if(thread_current()->priority > lock_ref->priority) {
+                //set the priority value of lock_ref to the priority of thread_current() if current thread's priority is bigger than lock_ref's priority
+                lock_ref->priority = thread_current()->priority;
+                //next part is for checking if our list already has that lock or not
+                bool flag = false;
+                if (!list_empty(&(lock_ref->holder->lock_list))) {
+                    struct list_elem *e;
+                    for (e = list_begin(&(lock_ref->holder->lock_list)); e != list_end(&(lock_ref->holder->lock_list)); e = list_next(e)) {
+                        struct lock *lock_elem_from_list = list_entry(e, struct lock, elem);
+                        if (lock_elem_from_list == lock_ref) {
+                            flag = true;        //if the list has the lock, return the flag's value as true, otherwise, flase
+                            break;
+                        }
+                    }
+                }
+                //if the list has the lock, we update the list order, and let the priority of the top one of the list to be lock_ref's priority
+                if (flag) {
+
+                    list_sort(&(lock_ref->holder->lock_list), less_lock_priority, NULL);
+                    lock_ref->holder->priority = list_entry(list_front(&(lock_ref->holder->lock_list)), struct lock, elem)->priority;
+                    //if the list doesn't have the lock, we insert the lock, and let the priority of the top one of the list to be lock_ref's priority
+                } else {
+
+                    list_insert_ordered(&(lock_ref->holder->lock_list), &lock_ref->elem, less_lock_priority, NULL); //in thread_yeild()
+                    lock_ref->holder->priority = lock_ref->priority;
+
+                }
+                //Here we let the lock_ref be the lock which the holder is waitting, do the recursion
+                // so that we can donate the priority to the lock which the holder is waititng
+                lock_ref = lock_ref->holder->wait_which_lock;
+
+            }
+        }
+    }
+
+    sema_down (&lock->semaphore);
+
+    //the current_thread does not need any lock now
+    lock->holder = thread_current();
+    lock->priority = thread_current()->priority; //restore the lock's priority back to current_thread's priority
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -225,15 +275,44 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+//void lock_release();
 void
 lock_release (struct lock *lock) 
 {
-  ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
-
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
+    ASSERT (lock != NULL);
+    ASSERT (lock_held_by_current_thread (lock));
+    if(!thread_mlfqs) {
+        //first check if the lock_list of the holder is empty or not
+        if (!list_empty(&(lock->holder->lock_list))) {      //if it is not empty
+            //release the lock form the lock_list if the lock is in the lock_list
+            struct list_elem *e;
+            for (e = list_begin(&(lock->holder->lock_list));
+                 e != list_end(&(lock->holder->lock_list)); e = list_next(e)) {
+                struct lock *lock1 = list_entry(e, struct lock, elem);
+                if (lock1 == lock) {
+                    list_remove(e);
+                    break;
+                }
+            }
+            //after removing the lock from the list, check again see if the lock_list now is empty or not
+            if (!list_empty(&(lock->holder->lock_list))) {   //if it is not empty
+                //update the order of the list and and let the priority of the top one of the list to be lock_ref's priority.
+                list_sort(&(lock->holder->lock_list), less_lock_priority, NULL);
+                lock->holder->priority = list_entry(list_front(&(lock->holder->lock_list)),
+                struct lock, elem)->priority;
+            } else {
+                //if it is empty, let the original_priroity of lock_ref to be its priority.
+                lock->holder->priority = lock->holder->original_priority;
+            }
+        } else {
+            //if it is empty, let the original_priroity of lock_ref to be its priority.
+            lock->holder->priority = lock->holder->original_priority;
+        }
+    }
+    lock->holder = NULL;
+    sema_up(&lock->semaphore);
 }
+
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
@@ -245,7 +324,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {
@@ -316,9 +395,10 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters)) {
+    list_sort(&cond->waiters, cond_sema_less_priority, NULL);
+    sema_up(&list_entry(list_pop_front(&cond->waiters), struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -335,4 +415,10 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+bool
+cond_sema_less_priority (const struct list_elem *sema1, const struct list_elem *sema2)
+{
+    return list_entry(list_front(&(list_entry (sema1, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem)->priority > list_entry(list_front(&(list_entry (sema2, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem)->priority;
 }

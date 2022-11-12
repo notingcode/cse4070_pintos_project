@@ -27,7 +27,6 @@
 */
 
 #include "threads/synch.h"
-#include "kernel/list.h"
 #include <stdio.h>
 #include <string.h>
 #include "threads/interrupt.h"

@@ -179,9 +179,8 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
-bool less_priority(const struct list_elem *thread1, const struct list_elem *thread2);
-bool less_blocked_time(const struct list_elem *thread1, const struct list_elem *thread2);
-bool less_lock_priority(const struct list_elem *lock1, const struct list_elem *lock2);
+bool less_priority(const struct list_elem *t1, const struct list_elem *t2);
+bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2);
 
 void child_init(struct child *, tid_t);
 struct list_elem *getChild(tid_t id, struct list *childList);

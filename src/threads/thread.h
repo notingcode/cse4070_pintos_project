@@ -129,7 +129,6 @@ struct thread
    int64_t blocked_time;
    struct lock wait;
    int original_priority;
-   struct lock *wait_which_lock;
    struct list lock_list;
 
    unsigned magic; /* Detects stack overflow. */
@@ -184,7 +183,7 @@ int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
 bool less_priority(const struct list_elem *thread1, const struct list_elem *thread2);
-bool less_unblocked_ticks(const struct list_elem *thread1, const struct list_elem *thread2);
+bool less_blocked_time(const struct list_elem *thread1, const struct list_elem *thread2);
 bool less_lock_priority(const struct list_elem *lock1, const struct list_elem *lock2);
 
 void child_init(struct child *, tid_t);

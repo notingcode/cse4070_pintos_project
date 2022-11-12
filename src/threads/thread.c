@@ -631,7 +631,7 @@ void thread_sleep(int64_t ticks)
   old_level = intr_disable();
 
   thread_current()->blocked_time = timer_ticks() + ticks;
-  list_insert_ordered(&blocked_list, &thread_current()->elem, less_unblocked_ticks, NULL);
+  list_insert_ordered(&blocked_list, &thread_current()->elem, less_blocked_time, NULL);
   thread_block();
 
   intr_set_level(old_level);
@@ -656,16 +656,18 @@ bool less_priority(const struct list_elem *t1, const struct list_elem *t2)
   return list_entry(t1, struct thread, elem)->priority > list_entry(t2, struct thread, elem)->priority;
 }
 
-bool less_unblocked_ticks(const struct list_elem *t1, const struct list_elem *t2)
+bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2)
 {
   return list_entry(t1, struct thread, elem)->blocked_time < list_entry(t2, struct thread, elem)->blocked_time;
 }
 
-bool less_lock_priority(const struct list_elem *lock1, const struct list_elem *lock2)
-{
-  return list_entry(lock1, struct lock, elem)->priority > list_entry(lock2, struct lock, elem)->priority;
-}
-
 void thread_aging(){
-  return;
+  struct list_elem *e;
+
+  for (e = list_begin(&ready_list); e != list_end(&ready_list);
+       e = list_next(e))
+  {
+    struct thread *t = list_entry(e, struct thread, elem);
+    t->priority++;
+  }
 }

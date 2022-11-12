@@ -114,12 +114,11 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)){
-      //sort the list and make sure we can unblock the top one of the list
       list_sort (&sema->waiters, less_priority, NULL);
       thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
   }
   sema->value++;
-  thread_yield();     //once a thread is unblocked, we put it into the ready queue and let the CPU reschedule
+  thread_yield();
   intr_set_level (old_level);
 }
 

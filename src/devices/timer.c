@@ -92,7 +92,7 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
   if (ticks < 0)
     return;
-  thread_sleep(ticks); // put the thread which will be blocked soon into the blocked list
+  thread_sleep(ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

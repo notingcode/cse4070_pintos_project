@@ -342,9 +342,7 @@ void thread_foreach(thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-  if (list_empty(&(thread_current()->lock_list)))
-    thread_current()->priority = new_priority;
-  thread_current()->original_priority = new_priority;
+  thread_current()->priority = new_priority;
   thread_yield();
 }
 
@@ -471,14 +469,11 @@ init_thread(struct thread *t, const char *name, int priority)
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *)t + PGSIZE;
   t->priority = priority;
-  t->original_priority = priority;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
-
-  list_init(&(t->lock_list));
   
   list_init(&t->children);
   list_init(&t->files);

@@ -127,9 +127,6 @@ struct thread
    int exit_status;
 
    int64_t blocked_time;
-   struct lock wait;
-   int original_priority;
-   struct list lock_list;
 
    unsigned magic; /* Detects stack overflow. */
 };

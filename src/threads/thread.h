@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include "synch.h"
 
+#ifndef USERPROG
+extern bool thread_prior_aging;
+#endif
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -105,10 +109,25 @@ struct thread
    struct semaphore binary_semaphore;
    int waiting_child_number;
    bool is_waiting;
+   bool killed_by_kernel;
    int exit_status;
 #endif
 
    /* Owned by thread.c. */
+   uint32_t *pagedir; /* Page directory. */
+
+   struct list children;
+   struct list files;
+   struct thread *parent;
+
+   struct semaphore binary_semaphore;
+   int waiting_child_number;
+   bool is_waiting;
+   bool killed_by_kernel;
+   int exit_status;
+
+   int64_t blocked_time;
+
    unsigned magic; /* Detects stack overflow. */
 };
 
@@ -138,6 +157,9 @@ tid_t thread_create(const char *name, int priority, thread_func *, void *);
 void thread_block(void);
 void thread_unblock(struct thread *);
 
+void thread_sleep(int64_t ticks);
+void thread_wakeup(void);
+
 struct thread *thread_current(void);
 tid_t thread_tid(void);
 const char *thread_name(void);
@@ -156,6 +178,11 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+bool less_priority(const struct list_elem *t1, const struct list_elem *t2);
+bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2);
+
+void thread_aging();
 
 void child_init(struct child *, tid_t);
 struct list_elem *getChild(tid_t id, struct list *childList);

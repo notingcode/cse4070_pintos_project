@@ -1,10 +1,12 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
-#include <stdint.h>
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 #include "list.h"
 #include "process.h"
 #include "threads/synch.h"
@@ -27,9 +29,11 @@ struct file *get_file_from_fd(int fd);
 char *get_filename(const char *cmd_line);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
+int filesize(int fd);
 int fibonacci(int n);
 int max_of_four_int(int a, int b, int c, int d);
 
+static struct semaphore binary_semaphore;
 static int fd = 2;
 
 struct file_fd_map
@@ -41,6 +45,8 @@ struct file_fd_map
 
 void syscall_init(void)
 {
+    sema_init(&binary_semaphore, 1);
+
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -50,7 +56,10 @@ syscall_handler(struct intr_frame *f UNUSED)
     void *esp = f->esp;
 
     is_user_addr_valid(esp);
-
+    is_user_addr_valid(esp+1);
+    is_user_addr_valid(esp+2);
+    is_user_addr_valid(esp+3);
+    
     switch (*(int *)(esp))
     {
     case SYS_EXIT:
@@ -62,17 +71,23 @@ syscall_handler(struct intr_frame *f UNUSED)
         is_user_addr_valid(esp + 16);
         is_user_addr_valid(esp + 20);
         is_user_addr_valid(*(int *)(esp + 16));
+        sema_down(&binary_semaphore);
         f->eax = create(*(int *)(esp + 16), *(unsigned *)(esp + 20));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_OPEN:
         is_user_addr_valid(*(int *)(esp + 4));
+        sema_down(&binary_semaphore);
         f->eax = open(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_CLOSE:
         is_user_addr_valid(esp + 4);
+        sema_down(&binary_semaphore);
         close(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_READ:
@@ -88,12 +103,18 @@ syscall_handler(struct intr_frame *f UNUSED)
         is_user_addr_valid(esp + 20);
         is_user_addr_valid(esp + 24);
         is_user_addr_valid(*(int *)(esp + 24));
+        sema_down(&binary_semaphore);
         f->eax = write(*(int *)(esp + 20), *(int *)(esp + 24), *(unsigned *)(esp + 28));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_EXEC:
+        is_user_addr_valid(esp + 4);
+        is_user_addr_valid(esp + 5);
         is_user_addr_valid(*(int *)(esp + 4));
+        sema_down(&binary_semaphore);
         f->eax = exec(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_WAIT:
@@ -108,22 +129,37 @@ syscall_handler(struct intr_frame *f UNUSED)
     case SYS_SEEK:
         is_user_addr_valid(esp + 16);
         is_user_addr_valid(esp + 20);
+        sema_down(&binary_semaphore);
         seek(*(int *)(esp + 16), *(int *)(esp + 20));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_TELL:
         is_user_addr_valid(esp + 4);
+        sema_down(&binary_semaphore);
         f->eax = tell(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_REMOVE:
         is_user_addr_valid(esp + 4);
+        sema_down(&binary_semaphore);
         f->eax = remove(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
+        break;
+
+    case SYS_FILESIZE:
+        is_user_addr_valid(f->esp+4);
+        sema_down(&binary_semaphore);
+        f->eax = filesize(*(int *)(f->esp+4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_FIBO:
         is_user_addr_valid(esp + 4);
+        sema_down(&binary_semaphore);
         f->eax = fibonacci(*(int *)(esp + 4));
+        sema_up(&binary_semaphore);
         break;
 
     case SYS_MAXOFFOURINT:
@@ -131,7 +167,9 @@ syscall_handler(struct intr_frame *f UNUSED)
         is_user_addr_valid(esp + 8);
         is_user_addr_valid(esp + 12);
         is_user_addr_valid(esp + 16);
+        sema_down(&binary_semaphore);
         f->eax = max_of_four_int(*(int *)(esp + 4), *(int *)(esp + 8), *(int *)(esp + 12), *(int *)(esp + 16));
+        sema_up(&binary_semaphore);
         break;
     }
 }
@@ -205,9 +243,9 @@ int write(int fd, void *buffer, unsigned size)
     }
     else
     {
-        if (get_file_from_fd(fd) != NULL)
+        struct file *file_ = get_file_from_fd(fd);
+        if (file_ != NULL)
         {
-            struct file *file_ = get_file_from_fd(fd);
             return file_write(file_, buffer, size);
         }
     }
@@ -316,6 +354,7 @@ void exit(int status)
         child_->exit_status = status;
         child_->has_lock = false;
 
+        thread_current()->killed_by_kernel = true;
         thread_current()->exit_status = status;
 
         thread_exit();

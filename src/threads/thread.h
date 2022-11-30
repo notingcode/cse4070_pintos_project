@@ -182,6 +182,8 @@ int thread_get_load_avg(void);
 bool less_priority(const struct list_elem *t1, const struct list_elem *t2);
 bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2);
 
+void thread_aging();
+
 void child_init(struct child *, tid_t);
 struct list_elem *getChild(tid_t id, struct list *childList);
 

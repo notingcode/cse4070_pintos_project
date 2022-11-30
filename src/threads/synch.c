@@ -320,7 +320,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) {
-    list_sort(&cond->waiters, cond_sema_less_priority, NULL);
+    list_sort(&cond->waiters, less_priority_sema, NULL);
     sema_up(&list_entry(list_pop_front(&cond->waiters), struct semaphore_elem, elem)->semaphore);
   }
 }
@@ -342,7 +342,12 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 }
 
 bool
-cond_sema_less_priority (const struct list_elem *sema1, const struct list_elem *sema2)
+less_priority_sema (const struct list_elem *sema1, const struct list_elem *sema2)
 {
-    return list_entry(list_front(&(list_entry (sema1, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem)->priority > list_entry(list_front(&(list_entry (sema2, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem)->priority;
+  struct thread *t1, *t2;
+
+  t1 = list_entry(list_front(&(list_entry (sema1, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem);
+  t2 = list_entry(list_front(&(list_entry (sema2, struct semaphore_elem, elem)->semaphore.waiters)), struct thread, elem);
+
+  return t1->priority > t2->priority;
 }

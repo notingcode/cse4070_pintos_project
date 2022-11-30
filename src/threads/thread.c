@@ -208,12 +208,15 @@ tid_t thread_create(const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  /* Add to run queue. */
+  /* Add to ready queue. */
   thread_unblock(t);
 
-  struct child *child_ = malloc(sizeof(struct child));
-  child_init(child_, tid);
-  t->parent = thread_current();
+  if(thread_current()->priority < priority)
+    thread_yield();
+
+  // struct child *child_ = malloc(sizeof(struct child));
+  // child_init(child_, tid);
+  // t->parent = thread_current();
 
   return tid;
 }
@@ -656,7 +659,8 @@ bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2)
   return list_entry(t1, struct thread, elem)->blocked_time < list_entry(t2, struct thread, elem)->blocked_time;
 }
 
-void thread_aging(){
+void thread_aging()
+{
   struct list_elem *e;
 
   for (e = list_begin(&ready_list); e != list_end(&ready_list);

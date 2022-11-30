@@ -273,6 +273,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
     /* Open executable file. */
 
+    
+
     int argc = 0;
     char *argv[100], *token, *savePtr;
 

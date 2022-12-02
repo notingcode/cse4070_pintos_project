@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "synch.h"
+#include "kernel/hash.h"
 
 #ifndef USERPROG
 extern bool thread_prior_aging;
@@ -98,27 +99,29 @@ struct thread
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
 
-#ifdef USERPROG
-   /* Owned by userprog/process.c. */
-   uint32_t *pagedir; /* Page directory. */
+// #ifdef USERPROG
+//    /* Owned by userprog/process.c. */
+//    uint32_t *pagedir; /* Page directory. */
 
-   struct list children;
-   struct list files;
-   struct thread *parent;
+//    struct list children;
+//    struct list files;
+//    struct thread *parent;
 
-   struct semaphore binary_semaphore;
-   int waiting_child_number;
-   bool is_waiting;
-   bool killed_by_kernel;
-   int exit_status;
-#endif
+//    struct semaphore binary_semaphore;
+//    int waiting_child_number;
+//    bool is_waiting;
+//    bool killed_by_kernel;
+//    int exit_status;
+// #endif
 
    /* Owned by thread.c. */
    uint32_t *pagedir; /* Page directory. */
+   struct hash *pages;
 
    struct list children;
    struct list files;
    struct thread *parent;
+   void *user_esp;
 
    struct semaphore binary_semaphore;
    int waiting_child_number;

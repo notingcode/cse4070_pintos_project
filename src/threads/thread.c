@@ -13,7 +13,7 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
-// #include "vm/frame.h"
+#include "vm/frame.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -24,9 +24,6 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-
-/* List of processes in THREAD_BLOCKED state */
-static struct list blocked_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -57,10 +54,6 @@ static long long user_ticks;   /* # of timer ticks in user programs. */
 /* Scheduling. */
 #define TIME_SLICE 4          /* # of timer ticks to give each thread. */
 static unsigned thread_ticks; /* # of timer ticks since last yield. */
-
-#ifndef USERPROG
-bool thread_prior_aging;
-#endif
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -99,7 +92,6 @@ void thread_init(void)
   lock_init(&tid_lock);
   list_init(&ready_list);
   list_init(&all_list);
-  list_init(&blocked_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -143,13 +135,6 @@ void thread_tick(void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return();
-
-#ifndef USERPROG
-  thread_wakeup();
-
-  if (thread_prior_aging == true)
-    thread_aging();
-#endif
 }
 /* Prints thread statistics. */
 void thread_print_stats(void)
@@ -209,15 +194,12 @@ tid_t thread_create(const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  /* Add to ready queue. */
+  /* Add to run queue. */
   thread_unblock(t);
 
-  if(thread_current()->priority < priority)
-    thread_yield();
-
-  // struct child *child_ = malloc(sizeof(struct child));
-  // child_init(child_, tid);
-  // t->parent = thread_current();
+  struct child *child_ = malloc(sizeof(struct child));
+  child_init(child_, tid);
+  t->parent = thread_current();
 
   return tid;
 }
@@ -253,7 +235,7 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
+  list_push_back(&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -321,7 +303,7 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    list_insert_ordered(&ready_list, &cur->elem, less_priority, NULL);
+    list_push_back(&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -347,7 +329,6 @@ void thread_foreach(thread_action_func *func, void *aux)
 void thread_set_priority(int new_priority)
 {
   thread_current()->priority = new_priority;
-  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -478,7 +459,7 @@ init_thread(struct thread *t, const char *name, int priority)
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
-  
+
   list_init(&t->children);
   list_init(&t->files);
   t->exit_status = -4;
@@ -621,53 +602,4 @@ void child_init(struct child *child_, tid_t tid)
   child_->has_lock = false;
   child_->alive = true;
   list_push_back(&thread_current()->children, &child_->elem);
-}
-
-void thread_sleep(int64_t ticks)
-{
-  enum intr_level old_level;
-
-  old_level = intr_disable();
-
-  thread_current()->blocked_time = timer_ticks() + ticks;
-  list_insert_ordered(&blocked_list, &thread_current()->elem, less_blocked_time, NULL);
-  thread_block();
-
-  intr_set_level(old_level);
-}
-
-void thread_wakeup(void)
-{
-  struct thread *t_top;
-
-  while (!list_empty(&blocked_list))
-  {
-    t_top = list_entry(list_front(&blocked_list), struct thread, elem);
-    if (t_top->blocked_time > timer_ticks() || t_top->status != THREAD_BLOCKED)
-      break;
-    list_pop_front(&blocked_list);
-    thread_unblock(t_top);
-  }
-}
-
-bool less_priority(const struct list_elem *t1, const struct list_elem *t2)
-{
-  return list_entry(t1, struct thread, elem)->priority > list_entry(t2, struct thread, elem)->priority;
-}
-
-bool less_blocked_time(const struct list_elem *t1, const struct list_elem *t2)
-{
-  return list_entry(t1, struct thread, elem)->blocked_time < list_entry(t2, struct thread, elem)->blocked_time;
-}
-
-void thread_aging()
-{
-  struct list_elem *e;
-
-  for (e = list_begin(&ready_list); e != list_end(&ready_list);
-       e = list_next(e))
-  {
-    struct thread *t = list_entry(e, struct thread, elem);
-    t->priority++;
-  }
 }
